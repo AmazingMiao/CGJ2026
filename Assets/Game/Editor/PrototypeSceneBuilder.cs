@@ -288,6 +288,8 @@ namespace CGJ2026.EditorTools
             Rigidbody2D boulderBody = CreateBoulder(root.transform, inputReader, boulderSprite, worldLayer, boulderStart, cameraFollow);
             CreateRainEmitter(root.transform, rainWaterMaterial, playerSprite, playerStart + Vector3.up * 5.6f);
             SetObjectRef(cameraFollow, "target", playerBody.transform);
+            SetObjectRef(cameraFollow, "secondaryTarget", boulderBody.transform);
+            SetObjectRef(cameraFollow, "framingCamera", cameraFollow.GetComponent<Camera>());
 
             RespawnService respawnService = CreateRespawnService(root.transform, playerBody, boulderBody, deathVfxPrefab);
             SetObjectRef(playerBody.GetComponent<PlayerImpactHandler>(), "respawnService", respawnService);

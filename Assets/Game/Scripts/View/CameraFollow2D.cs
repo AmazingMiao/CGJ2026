@@ -6,13 +6,28 @@ namespace CGJ2026.View
     public sealed class CameraFollow2D : MonoBehaviour
     {
         [Header("Follow")]
+        [Tooltip("主目标(玩家)。始终参与取景。")]
         [SerializeField] private Transform target;
-        [SerializeField] private Vector2 offset = new Vector2(3f, 1.5f);
+        [Tooltip("次目标(巨石)。为空时退化为只跟随主目标。")]
+        [SerializeField] private Transform secondaryTarget;
+        [SerializeField] private Vector2 offset = new Vector2(0f, 1.5f);
         [SerializeField] private float followSpeed = 8f;
         [SerializeField] private float minX = -7f;
         [SerializeField] private float maxX = 41f;
         [SerializeField] private float minY = 1f;
         [SerializeField] private float maxY = 6f;
+
+        [Header("Framing - 同时框住两个目标")]
+        [Tooltip("正交相机引用。为空时在 Awake 里自动获取本物体上的 Camera。")]
+        [SerializeField] private Camera framingCamera;
+        [Tooltip("两目标水平跨度之外额外保留的世界边距(单位:世界单位)。")]
+        [SerializeField] private float framingPaddingX = 5f;
+        [Tooltip("两目标垂直跨度之外额外保留的世界边距(单位:世界单位)。")]
+        [SerializeField] private float framingPaddingY = 4f;
+        [SerializeField] private float minOrthographicSize = 6f;
+        [SerializeField] private float maxOrthographicSize = 13f;
+        [Tooltip("正交尺寸缩放的平滑速度。")]
+        [SerializeField] private float zoomSpeed = 6f;
 
         [Header("Impact Shake - Shape")]
         [Tooltip("Maximum translation in world units before stacked shakes are clamped.")]
@@ -53,6 +68,7 @@ namespace CGJ2026.View
         private readonly List<ShakePulse> activeShakes = new List<ShakePulse>(8);
         private Vector3 smoothedPosition;
         private Quaternion unshakenRotation;
+        private float smoothedOrthographicSize;
 
         private struct ShakePulse
         {
@@ -69,6 +85,20 @@ namespace CGJ2026.View
         public void SetTarget(Transform followTarget)
         {
             target = followTarget;
+        }
+
+        /// <summary>
+        /// 同时设置主、次目标,相机会持续把两者都框在画面内。
+        /// </summary>
+        public void SetTargets(Transform primaryTarget, Transform framedSecondaryTarget)
+        {
+            target = primaryTarget;
+            secondaryTarget = framedSecondaryTarget;
+        }
+
+        public void SetSecondaryTarget(Transform framedSecondaryTarget)
+        {
+            secondaryTarget = framedSecondaryTarget;
         }
 
         // Kept for existing callers. New impact emitters should provide a direction as well.
@@ -116,29 +146,94 @@ namespace CGJ2026.View
         {
             smoothedPosition = transform.position;
             unshakenRotation = transform.rotation;
+
+            if (framingCamera == null)
+            {
+                framingCamera = GetComponent<Camera>();
+            }
+
+            smoothedOrthographicSize = framingCamera != null && framingCamera.orthographic
+                ? framingCamera.orthographicSize
+                : minOrthographicSize;
         }
 
         private void LateUpdate()
         {
             float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
 
-            if (target != null)
+            if (TryGetFramingBounds(out Vector2 framingCenter, out Vector2 framingExtents))
             {
                 Vector3 desiredPosition = new Vector3(
-                    Mathf.Clamp(target.position.x + offset.x, minX, maxX),
-                    Mathf.Clamp(target.position.y + offset.y, minY, maxY),
+                    Mathf.Clamp(framingCenter.x + offset.x, minX, maxX),
+                    Mathf.Clamp(framingCenter.y + offset.y, minY, maxY),
                     smoothedPosition.z);
 
                 smoothedPosition = Vector3.Lerp(
                     smoothedPosition,
                     desiredPosition,
                     1f - Mathf.Exp(-followSpeed * deltaTime));
+
+                UpdateOrthographicSize(framingExtents, deltaTime);
             }
 
             ComputeShake(deltaTime, out Vector2 shakeOffset, out float shakeRotation);
             transform.SetPositionAndRotation(
                 smoothedPosition + (Vector3)shakeOffset,
                 unshakenRotation * Quaternion.Euler(0f, 0f, shakeRotation));
+        }
+
+        /// <summary>
+        /// 计算能同时包含所有有效目标的取景中心与半跨度(未含边距)。
+        /// </summary>
+        private bool TryGetFramingBounds(out Vector2 center, out Vector2 extents)
+        {
+            center = Vector2.zero;
+            extents = Vector2.zero;
+
+            bool hasPrimary = target != null;
+            bool hasSecondary = secondaryTarget != null;
+            if (!hasPrimary && !hasSecondary)
+            {
+                return false;
+            }
+
+            Vector2 first = hasPrimary ? (Vector2)target.position : (Vector2)secondaryTarget.position;
+            Vector2 min = first;
+            Vector2 max = first;
+
+            if (hasPrimary && hasSecondary)
+            {
+                Vector2 other = secondaryTarget.position;
+                min = Vector2.Min(min, other);
+                max = Vector2.Max(max, other);
+            }
+
+            center = (min + max) * 0.5f;
+            extents = (max - min) * 0.5f;
+            return true;
+        }
+
+        private void UpdateOrthographicSize(Vector2 framingExtents, float deltaTime)
+        {
+            if (framingCamera == null || !framingCamera.orthographic)
+            {
+                return;
+            }
+
+            float aspect = framingCamera.aspect > 0.0001f ? framingCamera.aspect : 16f / 9f;
+            float requiredHalfHeight = framingExtents.y + framingPaddingY;
+            float requiredHalfWidth = framingExtents.x + framingPaddingX;
+
+            // 正交尺寸即半高;水平方向需换算成等效半高。
+            float desiredSize = Mathf.Max(requiredHalfHeight, requiredHalfWidth / aspect);
+            desiredSize = Mathf.Clamp(desiredSize, minOrthographicSize, maxOrthographicSize);
+
+            smoothedOrthographicSize = Mathf.Lerp(
+                smoothedOrthographicSize,
+                desiredSize,
+                1f - Mathf.Exp(-zoomSpeed * deltaTime));
+
+            framingCamera.orthographicSize = smoothedOrthographicSize;
         }
 
         private void OnDisable()
@@ -238,6 +333,11 @@ namespace CGJ2026.View
         private void OnValidate()
         {
             followSpeed = Mathf.Max(0f, followSpeed);
+            framingPaddingX = Mathf.Max(0f, framingPaddingX);
+            framingPaddingY = Mathf.Max(0f, framingPaddingY);
+            minOrthographicSize = Mathf.Max(0.1f, minOrthographicSize);
+            maxOrthographicSize = Mathf.Max(minOrthographicSize, maxOrthographicSize);
+            zoomSpeed = Mathf.Max(0f, zoomSpeed);
             shakeMagnitude = Mathf.Max(0f, shakeMagnitude);
             shakeRotationDegrees = Mathf.Max(0f, shakeRotationDegrees);
             shakeFrequency = Mathf.Max(0f, shakeFrequency);
