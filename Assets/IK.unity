@@ -343,16 +343,19 @@ MonoBehaviour:
   castDistance: 1
   groundMask:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 192
   footHeightOffset: 0
   hangWhenNoGround: 1
   enableGait: 1
+  bodyController: {fileID: 410741258}
   maxSwingAngle: 35
   strideLength: 3
   oppositePhase: 0
   liftHeight: 0.5
   gaitSettleSpeed: 8
   idleSpeedThreshold: 0.05
+  airborneFootOffset: {x: 0, y: -0.7}
+  airborneSettleSpeed: 12
 --- !u!1 &410741256
 GameObject:
   m_ObjectHideFlags: 0
@@ -432,7 +435,7 @@ MonoBehaviour:
   groundCheckDistance: 0.2
   groundMask:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 192
 --- !u!70 &410741259
 CapsuleCollider2D:
   m_ObjectHideFlags: 0
@@ -688,7 +691,7 @@ Transform:
   m_GameObject: {fileID: 462219208}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -1.43, z: 0}
+  m_LocalPosition: {x: 0, y: -1.56, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1098,16 +1101,19 @@ MonoBehaviour:
   castDistance: 1
   groundMask:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 192
   footHeightOffset: 0
   hangWhenNoGround: 1
   enableGait: 1
+  bodyController: {fileID: 410741258}
   maxSwingAngle: 35
   strideLength: 3
   oppositePhase: 1
   liftHeight: 0.5
   gaitSettleSpeed: 8
   idleSpeedThreshold: 0.05
+  airborneFootOffset: {x: 0, y: -0.7}
+  airborneSettleSpeed: 12
 --- !u!1 &795138481
 GameObject:
   m_ObjectHideFlags: 0
@@ -1355,7 +1361,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -6199720543617963891, guid: 7d88c8d3c507a4817881d8e18d888798, type: 3}
+  m_Sprite: {fileID: -6199720543617963891, guid: eb7b7f76bf75b4b888971da189edf550, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -2385,7 +2391,7 @@ GameObject:
   - component: {fileID: 1777504439}
   - component: {fileID: 1777504442}
   - component: {fileID: 1777504441}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Boulder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
