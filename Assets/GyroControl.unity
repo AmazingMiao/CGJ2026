@@ -390,7 +390,7 @@ GameObject:
   - component: {fileID: 975741525}
   - component: {fileID: 975741524}
   - component: {fileID: 975741523}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Boulder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -892,71 +892,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 90}
---- !u!1 &1808308848
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1808308851}
-  - component: {fileID: 1808308850}
-  - component: {fileID: 1808308849}
-  m_Layer: 0
-  m_Name: GyroNet
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1808308849
+--- !u!114 &1808308849 stripped
 MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
+  m_CorrespondingSourceObject: {fileID: 1445335646555480988, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+  m_PrefabInstance: {fileID: 6818690641610625743}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1808308848}
+  m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f68e27694da1d412fa5d1f840dd843d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CGJ2026.Gyro.GyroReceiver
-  server: {fileID: 1808308850}
-  logToConsole: 1
-  logInterval: 0.2
---- !u!114 &1808308850
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1808308848}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c23dd5b93f7d54f0cab2cb523ef66b41, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CGJ2026.Gyro.GyroServer
-  port: 8080
-  pcIpForLog: 172.20.10.2
-  tlsPort: 8443
-  autoStartTlsProxy: 1
-  pythonExecutable: python3
---- !u!4 &1808308851
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1808308848}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1850038979
 GameObject:
   m_ObjectHideFlags: 0
@@ -1123,12 +1069,69 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 90}
+--- !u!1001 &6818690641610625743
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2580256645478038051, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8274943401979172123, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
+      propertyPath: m_Name
+      value: GyroNet
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: baef5e90f0de446b08dd58d7e8160adb, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 608642390}
-  - {fileID: 1808308851}
+  - {fileID: 6818690641610625743}
   - {fileID: 975741527}
   - {fileID: 928106830}
   - {fileID: 1510249914}
