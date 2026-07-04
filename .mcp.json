@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "UnityMCP": {
+      "type": "stdio",
+      "command": "/Users/nmgb/.local/bin/uvx",
+      "args": ["--from", "mcpforunityserver==10.0.0", "mcp-for-unity"]
+    }
+  }
+}
