@@ -54,6 +54,40 @@ namespace CGJ2026.Gyro
         /// 供 GyroReceiver 在主线程取包。
         public ConcurrentQueue<string> Incoming => incoming;
 
+        /// 向所有已连接的手机广播一条 JSON 文本(Mac → 手机)。雷达坐标、震动指令等都走这里。
+        public void Broadcast(string json)
+        {
+            if (!isRunning || string.IsNullOrEmpty(json))
+            {
+                return;
+            }
+
+            try
+            {
+                if (webSocketServer.WebSocketServices.TryGetServiceHost(webSocketPath, out WebSocketServiceHost host))
+                {
+                    host.Sessions.Broadcast(json);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[GyroServer] 广播失败:{ex.Message}");
+            }
+        }
+
+        /// 让手机震动约 ms 毫秒。网页端尽力而为:Android 有效;iOS Safari 无标准震动 API,
+        /// 仅能触发很弱的触感 hack。手机端打包成 Unity App 后应改由 App 侧 Handheld.Vibrate 实现。
+        public void SendVibrate(int milliseconds = 200)
+        {
+            Broadcast($"{{\"type\":\"vibrate\",\"ms\":{milliseconds}}}");
+        }
+
+        [ContextMenu("测试:让手机震动")]
+        void TestVibrate()
+        {
+            SendVibrate(200);
+        }
+
         void Start()
         {
             Initialize();

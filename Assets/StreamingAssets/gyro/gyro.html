@@ -38,10 +38,19 @@
     <div class="row"><span>Beta(前后倾)</span><span id="beta">—</span></div>
     <div class="row"><span>Gamma(左右倾)</span><span id="gamma">—</span></div>
     <div class="row"><span>Alpha(朝向)</span><span id="alpha">—</span></div>
+    <div class="row"><span>加速度(含重力)</span><span id="accel">—</span></div>
+    <div class="row"><span>加速度(去重力)</span><span id="linAccel">—</span></div>
     <div class="row"><span>发送速率</span><span id="rate">0</span></div>
   </div>
 
-  <div class="card"><div id="log">点上面的按钮授权 + 连接。</div></div>
+  <div class="card">
+    <div class="row"><span>回传</span><span id="rx" class="warn">—</span></div>
+    <div id="log">点上面的按钮授权 + 连接。</div>
+  </div>
+
+  <!-- iOS Safari 无 navigator.vibrate;这个隐藏 switch + label 点击可触发 iOS 17.4+ 的轻微触感(兜底)。 -->
+  <input type="checkbox" id="hapticSwitch" switch style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" />
+  <label id="hapticLabel" for="hapticSwitch" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;"></label>
 
   <script>
     const $ = (id) => document.getElementById(id);
@@ -53,6 +62,10 @@
     const sendIntervalMs = 20;   // ~50Hz
     let sentCount = 0;
 
+    // devicemotion 与 deviceorientation 分开触发,这里缓存最近一帧加速度,随倾角一起打包发送。
+    let accG = { x: 0, y: 0, z: 0 };   // 含重力
+    let accL = { x: 0, y: 0, z: 0 };   // 去重力(线性)
+
     function log(msg) { logEl.textContent = msg; }
     function setStatus(text, cls) { statusEl.textContent = text; statusEl.className = cls; }
 
@@ -63,6 +76,52 @@
       socket.onopen = () => setStatus('已连接', 'ok');
       socket.onclose = () => { setStatus('已断开', 'bad'); log('连接断开,3 秒后重连…'); setTimeout(connect, 3000); };
       socket.onerror = () => { setStatus('连接错误', 'bad'); log('WebSocket 错误:确认已在 Safari 里接受过本页的证书警告。'); };
+      socket.onmessage = (ev) => onServerMessage(ev.data);
+    }
+
+    // Mac → 手机 的回传统一入口。目前处理 vibrate,以后可加 radar 等。
+    function onServerMessage(raw) {
+      let msg;
+      try { msg = JSON.parse(raw); } catch (e) { return; }
+      $('rx').textContent = raw;
+      $('rx').className = 'ok';
+      if (msg && msg.type === 'vibrate') {
+        vibrate(msg.ms || 200);
+      }
+    }
+
+    function vibrate(ms) {
+      // Android / 支持标准 API 的浏览器:真震动。iOS Safari 没有 navigator.vibrate。
+      let ok = false;
+      if (typeof navigator.vibrate === 'function') { ok = navigator.vibrate(ms); }
+      // iOS Safari:无 navigator.vibrate,点击 switch 的 label 触发系统轻微触感(iOS 17.4+)。
+      triggerIosHaptic();
+      // 可见反馈:即使没有物理震动,也能确认回传链路通了。
+      flashRx(ms, ok);
+    }
+
+    function triggerIosHaptic() {
+      const label = document.getElementById('hapticLabel');
+      if (label) { try { label.click(); } catch (e) {} }
+    }
+
+    function flashRx(ms, nativeOk) {
+      const el = $('rx');
+      el.textContent = `震动 ${ms}ms` + (nativeOk ? '(原生)' : '(仅触感/提示)');
+      document.body.style.transition = 'background 80ms';
+      document.body.style.background = '#333';
+      setTimeout(() => { document.body.style.background = '#111'; }, ms > 400 ? 400 : ms);
+    }
+
+    function onMotion(e) {
+      const g = e.accelerationIncludingGravity;
+      if (g) { accG = { x: g.x || 0, y: g.y || 0, z: g.z || 0 }; }
+      const a = e.acceleration;
+      if (a && (a.x !== null || a.y !== null || a.z !== null)) {
+        accL = { x: a.x || 0, y: a.y || 0, z: a.z || 0 };
+      }
+      $('accel').textContent = `${accG.x.toFixed(1)}, ${accG.y.toFixed(1)}, ${accG.z.toFixed(1)}`;
+      $('linAccel').textContent = `${accL.x.toFixed(1)}, ${accL.y.toFixed(1)}, ${accL.z.toFixed(1)}`;
     }
 
     function onOrientation(e) {
@@ -79,7 +138,11 @@
       lastSent = now;
 
       if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ Beta: beta, Gamma: gamma, Alpha: alpha }));
+        socket.send(JSON.stringify({
+          Beta: beta, Gamma: gamma, Alpha: alpha,
+          AccelX: accG.x, AccelY: accG.y, AccelZ: accG.z,
+          LinAccelX: accL.x, LinAccelY: accL.y, LinAccelZ: accL.z
+        }));
         sentCount++;
       }
     }
@@ -102,6 +165,24 @@
           }
         }
         window.addEventListener('deviceorientation', onOrientation, true);
+
+        // 加速度计:iOS 需单独申请 DeviceMotionEvent 权限(与陀螺仪是不同的授权)。
+        if (typeof DeviceMotionEvent !== 'undefined' &&
+            typeof DeviceMotionEvent.requestPermission === 'function') {
+          try {
+            const mres = await DeviceMotionEvent.requestPermission();
+            if (mres === 'granted') {
+              window.addEventListener('devicemotion', onMotion, true);
+            } else {
+              log('加速度权限被拒(陀螺仪仍可用)。');
+            }
+          } catch (e) {
+            log('加速度授权异常:' + e);
+          }
+        } else {
+          window.addEventListener('devicemotion', onMotion, true);
+        }
+
         setStatus('已授权', 'warn');
         connect();
       } catch (err) {

@@ -71,7 +71,9 @@ namespace CGJ2026.Gyro
                 if (logToConsole && Time.unscaledTime - lastLogTime >= logInterval)
                 {
                     lastLogTime = Time.unscaledTime;
-                    Debug.Log($"[GyroReceiver] Beta(前后)={tilt.Beta:F1}  Gamma(左右)={tilt.Gamma:F1}  Alpha={tilt.Alpha:F1}");
+                    Debug.Log($"[GyroReceiver] 倾角 β={tilt.Beta:F1} γ={tilt.Gamma:F1} α={tilt.Alpha:F1} · " +
+                              $"加速度(含重力)=({tilt.AccelX:F1},{tilt.AccelY:F1},{tilt.AccelZ:F1}) " +
+                              $"去重力=({tilt.LinAccelX:F1},{tilt.LinAccelY:F1},{tilt.LinAccelZ:F1})");
                 }
             }
         }

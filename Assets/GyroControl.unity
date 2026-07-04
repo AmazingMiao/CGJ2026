@@ -409,11 +409,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1773efa9e64a847da95e3521de5680cc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CGJ2026.Gyro.BoulderGravityController
-  receiver: {fileID: 0}
+  receiver: {fileID: 1808308849}
   gravityStrength: 9.8
   smoothTime: 0.08
+  deadZoneDegrees: 10
+  zeroGravityDamping: 1.5
+  activeDamping: 0
   invertGamma: 0
-  invertBeta: 0
+  invertBeta: 1
+  enableDash: 0
+  dashAccelThreshold: 18
+  dashSpeed: 20
+  dashCooldown: 0.4
+  invertDashX: 1
+  invertDashY: 0
 --- !u!58 &975741524
 CircleCollider2D:
   m_ObjectHideFlags: 0
