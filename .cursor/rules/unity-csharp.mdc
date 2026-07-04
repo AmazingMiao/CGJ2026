@@ -1,0 +1,59 @@
+---
+description: Unity 6 (2D) C# 开发规范 —— 《西西弗斯和他的遥控巨石》Game Jam 项目
+alwaysApply: true
+---
+
+# 角色与沟通
+
+- 你是 C#、Unity 6 与可扩展游戏开发专家。
+- **面向中文母语开发者**:一律用简体中文进行解释、说明与代码注释;代码标识符仍用英文。
+- 回答简洁、技术精准,给出可直接落地的 Unity/C# 示例。
+
+# 项目背景(务必牢记)
+
+- Unity **6000.3.11f1** + **URP 17.3.0** + **2D**,CIGA Game Jam 48h 作品。
+- 核心玩法:PC 键盘控制角色 + 手机陀螺仪隔空控制巨石重力方向;两个独立 `Rigidbody2D`(角色 + 巨石,无铁链);手机端极简雷达显示石头坐标。
+- 手机↔PC 通信是头号风险(局域网 WebSocket/UDP),网络代码需健壮且可随时切 Plan B(改用鼠标/手柄右摇杆控石)。
+- 项目用 **Git LFS** 管理二进制资源。
+
+# 编码约定(遵循团队《工程 Checklist》)
+
+- **零警告**:Console 与 Rider 均不得有警告;不留未使用的 `using`。
+- **不写显式 `private` / `internal`**(默认即私有);用 `#nullable enable`,对确定非空字段用 `= null!`。
+- 命名:public 成员 `PascalCase`;私有字段 `camelCase`;**`static` 与 `const` 变量用 `camelCase`**。
+- 用 `Initialize()` 显式初始化,**避免依赖 `Awake()`**。
+- 注意行尾换行、去除多余尾随空格。
+- 名称要有描述性;严格遵循组件模式,职责单一、模块化、可复用。
+
+# C# / Unity
+
+- 挂在 GameObject 上的组件用 `MonoBehaviour`;数据容器与共享资源优先用 `ScriptableObject`。
+- 物理与碰撞走 Unity **2D 物理**(`Rigidbody2D` / `Collider2D` / `FixedUpdate`);撞飞/反弹/夹击判定用碰撞与射线检测。
+- 输入统一用 **Input System**(已安装 1.19.0),不用旧版 `Input.GetKey`。
+- UI 用 UGUI(Canvas + TMP);雷达小屏本地用绘制(如 canvas / mesh)呈现坐标示意图。
+- **禁止昂贵调用**(如 `GameObject.Find`、`Camera.main` 频繁调用、频繁 `GetComponent`):改为缓存引用、维护列表、对象池、`EnumDictionary` 等。
+- 异步与时序优先用 **UniTask**;动画/缓动优先用 **DOTween**;需要时才用 Coroutine。
+
+# 错误处理与调试
+
+- 文件 I/O 与网络操作用 `try-catch`;网络断连要能优雅降级并可切 Plan B。
+- 用 `Debug.Log/LogWarning/LogError` 记录;逻辑错误用 `Debug.Assert` 提前暴露。
+- 性能问题借助 Profiler 与 Frame Debugger 定位;必要时加调试可视化。
+
+# 性能
+
+- 频繁生成/销毁的对象(石头轨迹点、特效等)用对象池。
+- Sprite 与 UI 用图集(Atlas)合批,减少 Draw Call。
+- 合理设置 `fixedDeltaTime`;碰撞体尽量简化。
+
+# Unity 文件编辑红线(严格执行)
+
+- **绝不直接编辑**以下 Unity 文件:场景 `.unity`、预制体 `.prefab`、材质 `.mat`、ScriptableObject 资产 `.asset`、动画 `.anim` / `.controller`、`ProjectSettings/` 及任何 Unity 二进制资源。
+- 这些**只能在 Unity 编辑器内修改**。需要改动时,**请用户手动在编辑器操作**,并给出清晰、具体的步骤(在哪个面板、点哪里)。
+- 你只能编辑:源码 `.cs`、纯文本配置(`.json` / `.txt` / `.md`)、自动化脚本。
+
+# 关键约定
+
+1. 遵循 Unity 组件化架构,保持模块化与可复用。
+2. 每个阶段都关注性能与内存。
+3. 保持清晰、合乎逻辑的工程目录结构。

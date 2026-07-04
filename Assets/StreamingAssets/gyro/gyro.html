@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>巨石遥控器</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+    body {
+      margin: 0; padding: 16px;
+      font-family: -apple-system, system-ui, sans-serif;
+      background: #111; color: #eee;
+      display: flex; flex-direction: column; gap: 14px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 18px; margin: 0; color: #f5c542; }
+    button {
+      font-size: 20px; padding: 18px; border: none; border-radius: 12px;
+      background: #f5c542; color: #111; font-weight: 700;
+    }
+    button:disabled { background: #444; color: #888; }
+    .card { background: #1c1c1c; border-radius: 12px; padding: 14px; }
+    .row { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; padding: 4px 0; }
+    .row span:last-child { color: #6cf; font-weight: 700; }
+    #status { font-weight: 700; }
+    .ok { color: #4caf50; } .bad { color: #e53935; } .warn { color: #f5c542; }
+    #log { font-size: 12px; color: #888; white-space: pre-wrap; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>西西弗斯 · 巨石遥控器</h1>
+
+  <button id="enableBtn">开启陀螺仪并连接</button>
+
+  <div class="card">
+    <div class="row"><span>连接</span><span id="status" class="bad">未连接</span></div>
+    <div class="row"><span>Beta(前后倾)</span><span id="beta">—</span></div>
+    <div class="row"><span>Gamma(左右倾)</span><span id="gamma">—</span></div>
+    <div class="row"><span>Alpha(朝向)</span><span id="alpha">—</span></div>
+    <div class="row"><span>发送速率</span><span id="rate">0</span></div>
+  </div>
+
+  <div class="card"><div id="log">点上面的按钮授权 + 连接。</div></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $('status');
+    const logEl = $('log');
+
+    let socket = null;
+    let lastSent = 0;
+    const sendIntervalMs = 20;   // ~50Hz
+    let sentCount = 0;
+
+    function log(msg) { logEl.textContent = msg; }
+    function setStatus(text, cls) { statusEl.textContent = text; statusEl.className = cls; }
+
+    function connect() {
+      const url = `wss://${location.host}/ws`;
+      log('连接中… ' + url);
+      socket = new WebSocket(url);
+      socket.onopen = () => setStatus('已连接', 'ok');
+      socket.onclose = () => { setStatus('已断开', 'bad'); log('连接断开,3 秒后重连…'); setTimeout(connect, 3000); };
+      socket.onerror = () => { setStatus('连接错误', 'bad'); log('WebSocket 错误:确认已在 Safari 里接受过本页的证书警告。'); };
+    }
+
+    function onOrientation(e) {
+      const beta = e.beta || 0;
+      const gamma = e.gamma || 0;
+      const alpha = e.alpha || 0;
+
+      $('beta').textContent = beta.toFixed(1);
+      $('gamma').textContent = gamma.toFixed(1);
+      $('alpha').textContent = alpha.toFixed(1);
+
+      const now = performance.now();
+      if (now - lastSent < sendIntervalMs) return;
+      lastSent = now;
+
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ Beta: beta, Gamma: gamma, Alpha: alpha }));
+        sentCount++;
+      }
+    }
+
+    // 每秒刷新一次发送速率显示。
+    setInterval(() => { $('rate').textContent = sentCount + ' /s'; sentCount = 0; }, 1000);
+
+    async function enable() {
+      $('enableBtn').disabled = true;
+      try {
+        // iOS 13+ 必须在用户手势里请求权限。
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const res = await DeviceOrientationEvent.requestPermission();
+          if (res !== 'granted') {
+            setStatus('陀螺仪被拒绝', 'bad');
+            log('权限被拒。到 iOS 设置 → Safari → 动作与方向访问,打开后重试。');
+            $('enableBtn').disabled = false;
+            return;
+          }
+        }
+        window.addEventListener('deviceorientation', onOrientation, true);
+        setStatus('已授权', 'warn');
+        connect();
+      } catch (err) {
+        setStatus('授权异常', 'bad');
+        log('异常:' + err);
+        $('enableBtn').disabled = false;
+      }
+    }
+
+    $('enableBtn').addEventListener('click', enable);
+  </script>
+</body>
+</html>
