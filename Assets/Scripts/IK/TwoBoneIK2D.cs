@@ -41,11 +41,33 @@ namespace CGJ2026.IK
         [Tooltip("拉伸 sprite 的 Y 轴使其正好铺满骨段(sprite 需为中心 pivot、竖直朝向)。")]
         [SerializeField] bool stretchToFit = true;
 
-        [Tooltip("sprite 朝向修正:竖直(长边沿 +Y)的 sprite 用 -90;水平(长边沿 +X)用 0。")]
-        [SerializeField] float spriteAngleOffset = -90f;
+        [Tooltip("上骨 sprite 朝向修正:竖直(长边沿 +Y)用 -90;水平(长边沿 +X)用 0。")]
+        [SerializeField] float upperAngleOffset = -90f;
+
+        [Tooltip("下骨 sprite 朝向修正:竖直(长边沿 +Y)用 -90;水平(长边沿 +X)用 0。")]
+        [SerializeField] float lowerAngleOffset = -90f;
+
+        [Tooltip("关节交错量:上下骨各朝共享关节多伸出这么长(世界单位),叠住露出的缝隙。0 = 不交错。需开启 Stretch To Fit。")]
+        [SerializeField] float jointOverlap = 0.05f;
 
         float upperSpriteHeight = 1f;
         float lowerSpriteHeight = 1f;
+
+        /// 下骨实际到达的末端(脚踝 / 手腕)世界坐标。脚 sprite 应连到这里,而非 target
+        /// ——腿够不到时 target 会超出可达范围,连 target 会断裂。
+        public Vector2 EndPoint { get; private set; }
+
+        /// 中间关节(膝 / 肘)世界坐标。
+        public Vector2 JointPoint { get; private set; }
+
+        /// 上骨长度(供外部物理模拟等读取)。
+        public float UpperLength => upperLength;
+
+        /// 下骨长度(供外部物理模拟等读取)。
+        public float LowerLength => lowerLength;
+
+        /// 由外部接管姿态(如物理双摆):为 true 时跳过自身 IK 解算,改由外部调用 RenderPose。
+        public bool ExternalPose { get; set; }
 
         void OnEnable() => Initialize();
 
@@ -60,6 +82,11 @@ namespace CGJ2026.IK
         /// 求解一次并摆放两段骨骼。可从外部主动调用(如在自定义时序里驱动)。
         public void Solve()
         {
+            if (ExternalPose)
+            {
+                return;
+            }
+
             if (origin == null || upperBone == null || lowerBone == null || target == null)
             {
                 return;
@@ -81,16 +108,43 @@ namespace CGJ2026.IK
             Vector2 joint = root + dir * a + perpendicular * h;
             Vector2 end = root + dir * d;
 
-            PlaceBone(upperBone, root, joint, upperSpriteHeight);
-            PlaceBone(lowerBone, joint, end, lowerSpriteHeight);
+            JointPoint = joint;
+            EndPoint = end;
+
+            // 上骨朝关节(to 端)、下骨朝关节(from 端)各多伸 jointOverlap,叠住关节缝隙。
+            PlaceBone(upperBone, root, joint, upperSpriteHeight, 0f, jointOverlap, upperAngleOffset);
+            PlaceBone(lowerBone, joint, end, lowerSpriteHeight, jointOverlap, 0f, lowerAngleOffset);
         }
 
-        void PlaceBone(Transform bone, Vector2 from, Vector2 to, float spriteHeight)
+        /// 直接按外部给定的关节(肘/膝)与末端(手/脚)世界坐标摆放骨骼,不做 IK 解算。
+        /// 供物理双摆等外部驱动使用;需先把 ExternalPose 置为 true 以免被自身 Solve 覆盖。
+        public void RenderPose(Vector2 joint, Vector2 end)
         {
-            Vector2 segment = to - from;
-            float angle = Mathf.Atan2(segment.y, segment.x) * Mathf.Rad2Deg + spriteAngleOffset;
+            if (origin == null || upperBone == null || lowerBone == null)
+            {
+                return;
+            }
 
-            Vector3 midpoint = (Vector3)((from + to) * 0.5f);
+            Vector2 root = origin.position;
+            JointPoint = joint;
+            EndPoint = end;
+
+            PlaceBone(upperBone, root, joint, upperSpriteHeight, 0f, jointOverlap, upperAngleOffset);
+            PlaceBone(lowerBone, joint, end, lowerSpriteHeight, jointOverlap, 0f, lowerAngleOffset);
+        }
+
+        void PlaceBone(Transform bone, Vector2 from, Vector2 to, float spriteHeight, float extendFrom, float extendTo, float angleOffset)
+        {
+            Vector2 raw = to - from;
+            Vector2 dir = raw.sqrMagnitude > 1e-8f ? raw.normalized : Vector2.up;
+
+            // 交错只影响绘制:把 sprite 两端各向外延伸,IK 关节几何(from/to)保持不变。
+            Vector2 drawnFrom = from - dir * extendFrom;
+            Vector2 drawnTo = to + dir * extendTo;
+            Vector2 segment = drawnTo - drawnFrom;
+            float angle = Mathf.Atan2(segment.y, segment.x) * Mathf.Rad2Deg + angleOffset;
+
+            Vector3 midpoint = (Vector3)((drawnFrom + drawnTo) * 0.5f);
             midpoint.z = bone.position.z;
             bone.position = midpoint;
             bone.rotation = Quaternion.Euler(0f, 0f, angle);
