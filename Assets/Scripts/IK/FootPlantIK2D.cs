@@ -1,6 +1,7 @@
 #nullable enable
 
 using UnityEngine;
+using CGJ2026.Player;
 
 namespace CGJ2026.IK
 {
@@ -8,7 +9,8 @@ namespace CGJ2026.IK
     ///
     /// 横向移动时,射线方向绕髋前后摆动(钟摆),落点随之前后迈步;摆动相位由髋的水平
     /// 位移驱动,所以走多快摆多快、停下即收脚,不会出现脚在地面滑动。两条腿设为反相
-    /// (一只勾 Opposite Phase),即成左右交替的自然步态。
+    /// (一只勾 Opposite Phase),即成左右交替的自然步态。接入角色控制器后,离地(跳跃/
+    /// 下落)时自动停用踏步。
     ///
     /// 本组件只移动 target 的位置;真正让大腿/小腿弯曲的是 TwoBoneIK2D。放在 Update
     /// 刷新,保证先于 TwoBoneIK2D 的 LateUpdate 求解。仅在运行时生效(步态依赖平滑的
@@ -46,6 +48,9 @@ namespace CGJ2026.IK
         [Tooltip("启用步态摆动;关闭则射线始终竖直向下。")]
         [SerializeField] bool enableGait = true;
 
+        [Tooltip("角色控制器(可空);指定后,角色离地时停用踏步,脚不再迈步摆动。")]
+        [SerializeField] PlayerController2D bodyController = null!;
+
         [Tooltip("射线绕髋前后摆动的最大角度(度)。")]
         [SerializeField] float maxSwingAngle = 25f;
 
@@ -63,6 +68,13 @@ namespace CGJ2026.IK
 
         [Tooltip("低于此水平速度(单位/秒)视为站立,不推进步态,避免原地抖脚。")]
         [SerializeField] float idleSpeedThreshold = 0.05f;
+
+        [Header("空中")]
+        [Tooltip("离地时脚 target 相对髋的偏移(需接 Body Controller)。Y 距离应小于腿总长,把脚拉近使双腿微曲。")]
+        [SerializeField] Vector2 airborneFootOffset = new Vector2(0f, -0.7f);
+
+        [Tooltip("空中 target 从落地姿态过渡到微曲姿态的平滑速度(0 = 瞬间)。")]
+        [SerializeField] float airborneSettleSpeed = 12f;
 
         /// 当前是否踩到地面。
         public bool IsGrounded { get; private set; }
@@ -101,7 +113,19 @@ namespace CGJ2026.IK
             Transform basis = castOrigin != null ? castOrigin : transform;
             Vector2 pivot = (Vector2)basis.position + castOffset;
 
+            // 始终推进步态(离地时其 moving 已判 false,幅度收 0),保持相位/位移状态新鲜。
             (float swing, float lift) = AdvanceGait(pivot.x);
+
+            // 离地:把脚 target 拉近到髋下方,双腿微曲;平滑过渡避免起跳瞬间突跳。
+            if (bodyController != null && !bodyController.IsGrounded)
+            {
+                IsGrounded = false;
+                GroundNormal = Vector2.up;
+                Vector2 bentFoot = pivot + airborneFootOffset;
+                GroundPoint = bentFoot;
+                MoveTargetSmooth(bentFoot, airborneSettleSpeed);
+                return;
+            }
 
             Vector2 rayDir = (Vector2)(Quaternion.Euler(0f, 0f, swing) * Vector3.down);
             Vector2 rayStart = pivot - rayDir * castHeight;
@@ -150,6 +174,12 @@ namespace CGJ2026.IK
             float speed = Mathf.Abs(deltaX) / dt;
             bool moving = speed > idleSpeedThreshold;
 
+            // 角色离地时停用踏步:判为不移动,幅度经 strideBlend 平滑收回,相位停在原处。
+            if (bodyController != null && !bodyController.IsGrounded)
+            {
+                moving = false;
+            }
+
             if (moving && strideLength > 1e-4f)
             {
                 // 防混叠:单帧相位推进钳制在半个周期内,避免瞬移/大位移导致步态乱跳。
@@ -170,6 +200,16 @@ namespace CGJ2026.IK
         {
             Vector3 next = worldPosition;
             next.z = footTarget.position.z;
+            footTarget.position = next;
+        }
+
+        void MoveTargetSmooth(Vector2 worldPosition, float speed)
+        {
+            Vector3 current = footTarget.position;
+            Vector3 next = speed > 0f
+                ? Vector2.Lerp(current, worldPosition, 1f - Mathf.Exp(-speed * Time.deltaTime))
+                : worldPosition;
+            next.z = current.z;
             footTarget.position = next;
         }
 
