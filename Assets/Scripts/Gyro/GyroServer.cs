@@ -27,8 +27,8 @@ namespace CGJ2026.Gyro
     public class GyroServer : MonoBehaviour
     {
         [Header("网络(明文 WS,仅回环;对外由 tls-proxy.py 终止 TLS)")]
-        [Tooltip("明文 WS 端口。tls-proxy.py 默认把 :8443 的 /ws 透传到这里。")]
-        [SerializeField] int port = 8080;
+        [Tooltip("明文 WS 端口。tls-proxy.py 默认把 :8443 的 /ws 透传到这里。8080 与 Unity MCP server 的 http-url 端口冲突,故默认改用 8090。")]
+        [SerializeField] int port = 8090;
 
         [Tooltip("仅用于日志提示,填 PC 热点/局域网 IP,方便照着在手机上输入。")]
         [SerializeField] string pcIpForLog = "172.20.10.2";
