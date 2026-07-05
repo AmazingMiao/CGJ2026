@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace CGJ2026.View
@@ -8,6 +9,11 @@ namespace CGJ2026.View
     [RequireComponent(typeof(Rigidbody2D))]
     public sealed class CollisionShakeEmitter : MonoBehaviour
     {
+        // Fired the instant a qualifying impact drives the camera shake. Payload: normalized
+        // intensity in [0, 1] and the impact travel direction. Sound/FX can subscribe here so
+        // audio-visual feedback stays perfectly in sync with the screen shake.
+        public event Action<float, Vector2> Impacted;
+
         [SerializeField] private CameraFollow2D cameraFollow;
         [SerializeField] private LayerMask impactMask = ~0;
 
@@ -101,6 +107,7 @@ namespace CGJ2026.View
             lastImpactTime = Time.unscaledTime;
             lastImpactMetric = impactMetric;
             cameraFollow.AddImpactShake(intensity, direction);
+            Impacted?.Invoke(intensity, direction);
         }
 
         private bool IsImpactLayer(int layer)

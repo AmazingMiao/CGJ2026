@@ -5,112 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>巨石遥控器</title>
   <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
-    body {
-      margin: 0; padding: 16px;
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background: #EF8434;
       font-family: -apple-system, system-ui, sans-serif;
-      background: #111; color: #eee;
-      display: flex; flex-direction: column; gap: 14px;
-      min-height: 100vh;
     }
-    h1 { font-size: 18px; margin: 0; color: #f5c542; }
-    button {
-      font-size: 20px; padding: 18px; border: none; border-radius: 12px;
-      background: #f5c542; color: #111; font-weight: 700;
+    #stage {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
     }
-    button:disabled { background: #444; color: #888; }
-    .card { background: #1c1c1c; border-radius: 12px; padding: 14px; }
-    .row { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; padding: 4px 0; }
-    .row span:last-child { color: #6cf; font-weight: 700; }
-    #status { font-weight: 700; }
-    .ok { color: #4caf50; } .bad { color: #e53935; } .warn { color: #f5c542; }
-    #log { font-size: 12px; color: #888; white-space: pre-wrap; word-break: break-all; }
+    /* 中央箭头图片(透明底 PNG):图默认朝上,由 JS 旋转到重力方向。 */
+    #arrow {
+      width: 55vmin; height: 55vmin;
+      object-fit: contain;
+      transform: rotate(180deg);          /* 初始朝下(重力默认向下);图默认朝上,+180 = 朝下 */
+      transition: transform 80ms linear, opacity 120ms linear;
+      opacity: 0.2;
+      will-change: transform;
+    }
+    /* 点击开启层:授权 + 连接后隐藏,之后屏幕只剩橙底 + 箭头。 */
+    #tap {
+      position: fixed; inset: 0; z-index: 10;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 14vh;
+      background: rgba(0, 0, 0, 0.35);
+      color: #111; font-size: 6vmin; font-weight: 800; letter-spacing: 2px;
+    }
+    #tap.hidden { display: none; }
   </style>
 </head>
 <body>
-  <h1>西西弗斯 · 巨石遥控器</h1>
-
-  <button id="enableBtn">开启陀螺仪并连接</button>
-
-  <div class="card">
-    <div class="row"><span>连接</span><span id="status" class="bad">未连接</span></div>
-    <div class="row"><span>Beta(前后倾)</span><span id="beta">—</span></div>
-    <div class="row"><span>Gamma(左右倾)</span><span id="gamma">—</span></div>
-    <div class="row"><span>Alpha(朝向)</span><span id="alpha">—</span></div>
-    <div class="row"><span>加速度(含重力)</span><span id="accel">—</span></div>
-    <div class="row"><span>加速度(去重力)</span><span id="linAccel">—</span></div>
-    <div class="row"><span>发送速率</span><span id="rate">0</span></div>
+  <div id="stage">
+    <img id="arrow" src="arrow.png" alt="" draggable="false" />
   </div>
 
-  <div class="card">
-    <div class="row"><span>回传</span><span id="rx" class="warn">—</span></div>
-    <div id="log">点上面的按钮授权 + 连接。</div>
-  </div>
+  <div id="tap">点击开启</div>
 
-  <!-- iOS Safari 无 navigator.vibrate;这个隐藏 switch + label 点击可触发 iOS 17.4+ 的轻微触感(兜底)。 -->
+  <!-- iOS Safari 无 navigator.vibrate;隐藏 switch + label 点击兜底触发 iOS 17.4+ 轻微触感。 -->
   <input type="checkbox" id="hapticSwitch" switch style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" />
   <label id="hapticLabel" for="hapticSwitch" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;"></label>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const statusEl = $('status');
-    const logEl = $('log');
+    const arrowEl = $('arrow');
+    const tapEl = $('tap');
+
+    // 与 Unity 端 BoulderGravityController 保持一致的映射;若箭头方向镜像了,翻这两个开关。
+    const invertGamma = false;
+    const invertBeta = false;
+    const deadZoneDegrees = 10;
 
     let socket = null;
     let lastSent = 0;
     const sendIntervalMs = 20;   // ~50Hz
-    let sentCount = 0;
 
-    // devicemotion 与 deviceorientation 分开触发,这里缓存最近一帧加速度,随倾角一起打包发送。
+    // devicemotion 与 deviceorientation 分开触发,缓存最近一帧加速度随倾角一起发送。
     let accG = { x: 0, y: 0, z: 0 };   // 含重力
     let accL = { x: 0, y: 0, z: 0 };   // 去重力(线性)
 
-    function log(msg) { logEl.textContent = msg; }
-    function setStatus(text, cls) { statusEl.textContent = text; statusEl.className = cls; }
-
     function connect() {
       const url = `wss://${location.host}/ws`;
-      log('连接中… ' + url);
       socket = new WebSocket(url);
-      socket.onopen = () => setStatus('已连接', 'ok');
-      socket.onclose = () => { setStatus('已断开', 'bad'); log('连接断开,3 秒后重连…'); setTimeout(connect, 3000); };
-      socket.onerror = () => { setStatus('连接错误', 'bad'); log('WebSocket 错误:确认已在 Safari 里接受过本页的证书警告。'); };
+      socket.onopen = () => tapEl.classList.add('hidden');
+      socket.onclose = () => { tapEl.classList.remove('hidden'); tapEl.textContent = '已断开 · 点击重连'; setTimeout(connect, 3000); };
+      socket.onerror = () => { tapEl.classList.remove('hidden'); tapEl.textContent = '连接错误 · 点击重试'; };
       socket.onmessage = (ev) => onServerMessage(ev.data);
     }
 
-    // Mac → 手机 的回传统一入口。目前处理 vibrate,以后可加 radar 等。
+    // Mac → 手机 回传:目前只处理震动。
     function onServerMessage(raw) {
       let msg;
       try { msg = JSON.parse(raw); } catch (e) { return; }
-      $('rx').textContent = raw;
-      $('rx').className = 'ok';
-      if (msg && msg.type === 'vibrate') {
-        vibrate(msg.ms || 200);
-      }
+      if (msg && msg.type === 'vibrate') { vibrate(msg.ms || 200); }
     }
 
     function vibrate(ms) {
-      // Android / 支持标准 API 的浏览器:真震动。iOS Safari 没有 navigator.vibrate。
-      let ok = false;
-      if (typeof navigator.vibrate === 'function') { ok = navigator.vibrate(ms); }
-      // iOS Safari:无 navigator.vibrate,点击 switch 的 label 触发系统轻微触感(iOS 17.4+)。
-      triggerIosHaptic();
-      // 可见反馈:即使没有物理震动,也能确认回传链路通了。
-      flashRx(ms, ok);
-    }
-
-    function triggerIosHaptic() {
-      const label = document.getElementById('hapticLabel');
+      if (typeof navigator.vibrate === 'function') { navigator.vibrate(ms); }
+      const label = $('hapticLabel');
       if (label) { try { label.click(); } catch (e) {} }
-    }
-
-    function flashRx(ms, nativeOk) {
-      const el = $('rx');
-      el.textContent = `震动 ${ms}ms` + (nativeOk ? '(原生)' : '(仅触感/提示)');
-      document.body.style.transition = 'background 80ms';
-      document.body.style.background = '#333';
-      setTimeout(() => { document.body.style.background = '#111'; }, ms > 400 ? 400 : ms);
     }
 
     function onMotion(e) {
@@ -120,8 +93,28 @@
       if (a && (a.x !== null || a.y !== null || a.z !== null)) {
         accL = { x: a.x || 0, y: a.y || 0, z: a.z || 0 };
       }
-      $('accel').textContent = `${accG.x.toFixed(1)}, ${accG.y.toFixed(1)}, ${accG.z.toFixed(1)}`;
-      $('linAccel').textContent = `${accL.x.toFixed(1)}, ${accL.y.toFixed(1)}, ${accL.z.toFixed(1)}`;
+    }
+
+    // 用与巨石完全相同的公式把倾角换算成重力方向,再旋转箭头。
+    function updateArrow(beta, gamma) {
+      const rad = Math.PI / 180;
+      const g = invertGamma ? -gamma : gamma;
+      const b = invertBeta ? -beta : beta;
+
+      const gx = Math.abs(g) < deadZoneDegrees ? 0 : Math.sin(g * rad) * Math.cos(b * rad);
+      const gy = Math.abs(b) < deadZoneDegrees ? 0 : Math.sin(b * rad);
+
+      const mag = Math.hypot(gx, gy);
+      if (mag < 1e-3) {
+        // 无重力(两轴都在死区):箭头淡出。
+        arrowEl.style.opacity = '0.2';
+        return;
+      }
+
+      arrowEl.style.opacity = '1';
+      // atan2 的 0° 指向右;箭头图默认朝上,故 +90° 换算基准。gy 向下为正以匹配真机手感。
+      const deg = Math.atan2(gy, gx) * 180 / Math.PI + 90;
+      arrowEl.style.transform = `rotate(${deg}deg)`;
     }
 
     function onOrientation(e) {
@@ -129,9 +122,7 @@
       const gamma = e.gamma || 0;
       const alpha = e.alpha || 0;
 
-      $('beta').textContent = beta.toFixed(1);
-      $('gamma').textContent = gamma.toFixed(1);
-      $('alpha').textContent = alpha.toFixed(1);
+      updateArrow(beta, gamma);
 
       const now = performance.now();
       if (now - lastSent < sendIntervalMs) return;
@@ -143,56 +134,38 @@
           AccelX: accG.x, AccelY: accG.y, AccelZ: accG.z,
           LinAccelX: accL.x, LinAccelY: accL.y, LinAccelZ: accL.z
         }));
-        sentCount++;
       }
     }
 
-    // 每秒刷新一次发送速率显示。
-    setInterval(() => { $('rate').textContent = sentCount + ' /s'; sentCount = 0; }, 1000);
-
     async function enable() {
-      $('enableBtn').disabled = true;
       try {
         // iOS 13+ 必须在用户手势里请求权限。
         if (typeof DeviceOrientationEvent !== 'undefined' &&
             typeof DeviceOrientationEvent.requestPermission === 'function') {
           const res = await DeviceOrientationEvent.requestPermission();
-          if (res !== 'granted') {
-            setStatus('陀螺仪被拒绝', 'bad');
-            log('权限被拒。到 iOS 设置 → Safari → 动作与方向访问,打开后重试。');
-            $('enableBtn').disabled = false;
-            return;
-          }
+          if (res !== 'granted') { tapEl.textContent = '陀螺仪被拒 · 点击重试'; return; }
         }
         window.addEventListener('deviceorientation', onOrientation, true);
 
-        // 加速度计:iOS 需单独申请 DeviceMotionEvent 权限(与陀螺仪是不同的授权)。
+        // 加速度计:iOS 需单独申请 DeviceMotionEvent 权限。
         if (typeof DeviceMotionEvent !== 'undefined' &&
             typeof DeviceMotionEvent.requestPermission === 'function') {
           try {
             const mres = await DeviceMotionEvent.requestPermission();
-            if (mres === 'granted') {
-              window.addEventListener('devicemotion', onMotion, true);
-            } else {
-              log('加速度权限被拒(陀螺仪仍可用)。');
-            }
-          } catch (e) {
-            log('加速度授权异常:' + e);
-          }
+            if (mres === 'granted') { window.addEventListener('devicemotion', onMotion, true); }
+          } catch (e) { /* 陀螺仪仍可用 */ }
         } else {
           window.addEventListener('devicemotion', onMotion, true);
         }
 
-        setStatus('已授权', 'warn');
         connect();
       } catch (err) {
-        setStatus('授权异常', 'bad');
-        log('异常:' + err);
-        $('enableBtn').disabled = false;
+        tapEl.textContent = '授权异常 · 点击重试';
       }
     }
 
-    $('enableBtn').addEventListener('click', enable);
+    // 整个提示层都可点,免去单独按钮。
+    tapEl.addEventListener('click', enable);
   </script>
 </body>
 </html>

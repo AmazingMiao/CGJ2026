@@ -38,6 +38,8 @@ CONTENT_TYPES = {
     ".css": "text/css; charset=utf-8",
     ".ico": "image/x-icon",
     ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
     ".json": "application/json; charset=utf-8",
 }
 

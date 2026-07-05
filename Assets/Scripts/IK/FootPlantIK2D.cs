@@ -121,7 +121,7 @@ namespace CGJ2026.IK
             {
                 IsGrounded = false;
                 GroundNormal = Vector2.up;
-                Vector2 bentFoot = pivot + airborneFootOffset;
+                Vector2 bentFoot = ClampToHip(pivot + airborneFootOffset, pivot.y);
                 GroundPoint = bentFoot;
                 MoveTargetSmooth(bentFoot, airborneSettleSpeed);
                 return;
@@ -137,7 +137,7 @@ namespace CGJ2026.IK
                 IsGrounded = true;
                 GroundNormal = hit.normal;
                 GroundPoint = hit.point;
-                MoveTarget(hit.point + hit.normal * footHeightOffset + Vector2.up * lift);
+                MoveTarget(ClampToHip(hit.point + hit.normal * footHeightOffset + Vector2.up * lift, pivot.y));
                 return;
             }
 
@@ -147,8 +147,15 @@ namespace CGJ2026.IK
             GroundPoint = fallback;
             if (hangWhenNoGround)
             {
-                MoveTarget(fallback + Vector2.up * lift);
+                MoveTarget(ClampToHip(fallback + Vector2.up * lift, pivot.y));
             }
+        }
+
+        /// 夹住脚 target 的高度:Y 不得高于髋(hipY),避免脚抬过髋部。
+        static Vector2 ClampToHip(Vector2 position, float hipY)
+        {
+            position.y = Mathf.Min(position.y, hipY);
+            return position;
         }
 
         /// 根据髋的水平位移推进步态相位,返回本帧的摆动角与抬脚高度。
