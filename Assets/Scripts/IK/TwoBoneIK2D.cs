@@ -60,6 +60,9 @@ namespace CGJ2026.IK
         /// 中间关节(膝 / 肘)世界坐标。
         public Vector2 JointPoint { get; private set; }
 
+        /// 链条起点锚点(肩 / 髋),供外部物理模拟读取根位置。
+        public Transform Origin => origin;
+
         /// 上骨长度(供外部物理模拟等读取)。
         public float UpperLength => upperLength;
 
